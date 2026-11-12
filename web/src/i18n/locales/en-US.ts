@@ -661,11 +661,14 @@ export default {
     },
     embed: {
         title: "Choose an API key",
-        description: "Requests always go to this site and are billed to the chosen key. The models available on the canvas follow the key's group.",
+        description: "Requests go to this site and are billed to the chosen key; available models follow the key's group.",
         use: "Use this key",
         noKey: "No usable key yet. Create a key in a group with image or video models first.",
         manageKeys: "Go to API keys",
-        keySummary: "Group: {{group}} · Image {{image}} · Video {{video}} · Chat {{text}}",
+        group: "Group {{group}}",
+        image: "Image",
+        video: "Video",
+        text: "Chat",
     },
     locale: {
         zhCN: "简体中文",

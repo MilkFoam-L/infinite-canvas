@@ -661,11 +661,14 @@ export default {
     },
     embed: {
         title: "选择密钥",
-        description: "接口地址固定为本站，生成费用从所选密钥扣除。画布里可用的模型由该密钥所在分组决定。",
+        description: "请求固定发往本站并从所选密钥扣费，可用模型取决于密钥所在分组。",
         use: "使用此密钥",
         noKey: "还没有可用的密钥，请先在本站创建一个包含生图或生视频模型分组的密钥。",
         manageKeys: "前往 API 密钥",
-        keySummary: "分组：{{group}} · 生图 {{image}} · 视频 {{video}} · 对话 {{text}}",
+        group: "分组 {{group}}",
+        image: "生图",
+        video: "视频",
+        text: "对话",
     },
     locale: {
         zhCN: "简体中文",
