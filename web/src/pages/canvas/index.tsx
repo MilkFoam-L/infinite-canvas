@@ -14,6 +14,8 @@ import { useCanvasStore } from "@/stores/canvas/use-canvas-store";
 import { useCanvasUiStore } from "@/stores/canvas/use-canvas-ui-store";
 import { exportCanvasProjects } from "@/lib/canvas/canvas-export";
 import { hasAgentUrlBootstrap } from "@/lib/agent/agent-url-bootstrap";
+import { APOPHISCODE_EMBED } from "@/lib/apophiscode-embed";
+import { useConfigStore } from "@/stores/use-config-store";
 
 export default function CanvasPage() {
     const { message } = App.useApp();
@@ -36,7 +38,10 @@ export default function CanvasPage() {
         const agentHash = hasAgentUrlBootstrap(window.location.hash) ? window.location.hash : "";
         navigate(`/canvas/${id}${agentQuery}${agentHash}`, { replace: Boolean(agentHash) });
     };
-    const createAndEnter = () => enterProject(createProject(t("canvas.defaultTitle", { count: projects.length + 1 })));
+    const createAndEnter = () => {
+        enterProject(createProject(t("canvas.defaultTitle", { count: projects.length + 1 })));
+        if (APOPHISCODE_EMBED) useConfigStore.getState().openConfigDialog(false);
+    };
     const importCanvas = async (file?: File) => {
         if (!file) return;
         try {

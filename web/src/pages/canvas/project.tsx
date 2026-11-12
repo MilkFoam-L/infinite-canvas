@@ -1189,6 +1189,7 @@ function InfiniteCanvasPage() {
     const createAndOpenProject = useCallback(() => {
         const id = createProject(t("canvas.defaultTitle", { count: useCanvasStore.getState().projects.length + 1 }));
         navigate(`/canvas/${id}`);
+        if (APOPHISCODE_EMBED) useConfigStore.getState().openConfigDialog(false);
     }, [createProject, navigate, t]);
 
     const deleteCurrentProject = useCallback(() => {

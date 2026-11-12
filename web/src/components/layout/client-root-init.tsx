@@ -5,7 +5,8 @@ import { useTranslation } from "react-i18next";
 
 import { useConfigStore } from "@/stores/use-config-store";
 import { usePromptSourceScheduler } from "@/hooks/use-prompt-source-scheduler";
-import { APOPHISCODE_EMBED, INITIAL_HASH, readEmbedChannels } from "@/lib/apophiscode-embed";
+import { applyEmbedKey } from "@/components/layout/embed-key-modal";
+import { APOPHISCODE_EMBED, defaultKeyOption, embedBridge, rememberedKeyId } from "@/lib/apophiscode-embed";
 
 export function ClientRootInit({ children }: { children: ReactNode }) {
     const { message } = App.useApp();
@@ -13,7 +14,6 @@ export function ClientRootInit({ children }: { children: ReactNode }) {
     const handledConfigParams = useRef(false);
     const importChannelCredentials = useConfigStore((state) => state.importChannelCredentials);
     const openConfigDialog = useConfigStore((state) => state.openConfigDialog);
-    const applyEmbedChannels = useConfigStore((state) => state.applyEmbedChannels);
 
     usePromptSourceScheduler();
 
@@ -21,10 +21,12 @@ export function ClientRootInit({ children }: { children: ReactNode }) {
         if (handledConfigParams.current) return;
         if (APOPHISCODE_EMBED) {
             handledConfigParams.current = true;
-            const channels = readEmbedChannels(INITIAL_HASH);
-            if (!channels) return;
-            window.history.replaceState(window.history.state, "", `${window.location.pathname}${window.location.search}`);
-            applyEmbedChannels(channels);
+            // Refresh the remembered key's models on every open; ask when there is none.
+            void (async () => {
+                const option = defaultKeyOption((await embedBridge()?.list()) ?? [], rememberedKeyId());
+                if (option) await applyEmbedKey(option.id);
+                else openConfigDialog(false);
+            })().catch(() => openConfigDialog(false));
             return;
         }
         const searchParams = new URLSearchParams(window.location.search);
@@ -43,7 +45,7 @@ export function ClientRootInit({ children }: { children: ReactNode }) {
         else if (result.status === "updated") message.success(t("config.importedChannelUpdated", { name: result.channelName }));
         else if (result.status === "missing-base-url") message.error(t("config.importedChannelBaseUrlRequired"));
         else message.error(t("config.importedChannelBaseUrlInvalid"));
-    }, [applyEmbedChannels, importChannelCredentials, message, openConfigDialog, t]);
+    }, [importChannelCredentials, message, openConfigDialog, t]);
 
     return <>{children}</>;
 }

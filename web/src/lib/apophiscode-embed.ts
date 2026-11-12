@@ -1,42 +1,58 @@
 // ApophisCode embed (MilkFoam-L/infinite-canvas, branch apophiscode).
-// The host page at www.apophiscode.com/canvas passes the user's own keys and
-// models in the URL fragment, so they never reach a server log.
+// The host page www.apophiscode.com/canvas exposes a same-origin key bridge on
+// window.parent: the base URL is always the host site and the user picks one
+// of their own keys.
 import type { ModelCapability } from "@/stores/use-config-store";
 
 export const APOPHISCODE_EMBED = import.meta.env.VITE_APOPHISCODE_EMBED === "true";
 
-// Captured at module load: the "/" -> "/canvas" redirect drops the fragment
-// before React effects run.
-export const INITIAL_HASH = typeof window === "undefined" ? "" : window.location.hash;
+export type EmbedModel = { name: string; capability: ModelCapability };
 
 export type EmbedChannel = {
     id: string;
     name: string;
     baseUrl: string;
     apiKey: string;
-    models: { name: string; capability: ModelCapability }[];
+    models: EmbedModel[];
 };
 
-const CAPABILITIES: readonly string[] = ["image", "video", "text", "audio"];
+/** A key the user can pick; models are what its group and limits allow. */
+export type EmbedKeyOption = { id: number; name: string; group: string; models: EmbedModel[] };
 
-/** Reads `#embed=<base64url JSON>`; returns null when absent or malformed. */
-export function readEmbedChannels(hash: string): EmbedChannel[] | null {
-    const raw = new URLSearchParams(hash.replace(/^#/, "")).get("embed");
-    if (!raw) return null;
+type EmbedBridge = {
+    list: () => Promise<EmbedKeyOption[]>;
+    channel: (id: number) => Promise<EmbedChannel>;
+};
+
+export function embedBridge(): EmbedBridge | null {
     try {
-        const json = new TextDecoder().decode(Uint8Array.from(atob(raw.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0)));
-        const parsed: unknown = JSON.parse(json);
-        if (!Array.isArray(parsed)) return null;
-        return parsed
-            .filter((c): c is EmbedChannel => typeof c?.id === "string" && typeof c?.baseUrl === "string" && typeof c?.apiKey === "string" && Array.isArray(c?.models))
-            .map((c) => ({
-                id: c.id,
-                name: typeof c.name === "string" ? c.name : c.id,
-                baseUrl: c.baseUrl,
-                apiKey: c.apiKey,
-                models: c.models.filter((m) => typeof m?.name === "string" && CAPABILITIES.includes(m?.capability)),
-            }));
+        return (window.parent as Window & { apophiscodeCanvasBridge?: EmbedBridge }).apophiscodeCanvasBridge ?? null;
     } catch {
         return null;
     }
+}
+
+const KEY_STORAGE = "apophiscode:canvas-key-id";
+
+export function rememberedKeyId(): number | null {
+    try {
+        const id = Number(localStorage.getItem(KEY_STORAGE));
+        return Number.isFinite(id) && id > 0 ? id : null;
+    } catch {
+        return null;
+    }
+}
+
+export function rememberKeyId(id: number) {
+    try {
+        localStorage.setItem(KEY_STORAGE, String(id));
+    } catch {
+        // Storage unavailable: the picker opens again next time.
+    }
+}
+
+/** The remembered key when it is still listed, else the first key that can draw, else any key with models. */
+export function defaultKeyOption(options: EmbedKeyOption[], remembered: number | null): EmbedKeyOption | undefined {
+    const usable = options.filter((option) => option.models.length > 0);
+    return usable.find((option) => option.id === remembered) ?? usable.find((option) => option.models.some((model) => model.capability === "image")) ?? usable[0];
 }

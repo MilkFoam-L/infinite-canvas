@@ -16,30 +16,42 @@ afterAll(() => {
     else Reflect.deleteProperty(globalThis, "localStorage");
 });
 
-const { readEmbedChannels } = await import("../src/lib/apophiscode-embed");
+const { defaultKeyOption } = await import("../src/lib/apophiscode-embed");
 const { applyEmbedChannels, defaultConfig } = await import("../src/stores/use-config-store");
 
-const channels = [
-    { id: "image", name: "生图", baseUrl: "https://www.apophiscode.com", apiKey: "sk-a", models: [{ name: "gpt-image-2.5", capability: "image" }, { name: "gpt-6-sol", capability: "text" }] },
-    { id: "video", name: "视频", baseUrl: "https://www.apophiscode.com", apiKey: "sk-b", models: [{ name: "seedance-2", capability: "video" }, { name: "bad", capability: "nope" }] },
-];
-const encode = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
+const channel = {
+    id: "key-2",
+    name: "生图",
+    baseUrl: "https://www.apophiscode.com",
+    apiKey: "sk-a",
+    models: [
+        { name: "gpt-image-2.5", capability: "image" as const },
+        { name: "seedance-2", capability: "video" as const },
+        { name: "gpt-6-sol", capability: "text" as const },
+    ],
+};
 
-test("reads channels from the fragment and drops unknown capabilities", () => {
-    const read = readEmbedChannels(`#embed=${encode(channels)}`);
-    expect(read?.map((c) => c.models.map((m) => m.name))).toEqual([["gpt-image-2.5", "gpt-6-sol"], ["seedance-2"]]);
-    expect(readEmbedChannels("#embed=%%%")).toBeNull();
-    expect(readEmbedChannels("")).toBeNull();
+test("the host channel replaces the stock channel and defaults follow capability", () => {
+    const config = applyEmbedChannels(defaultConfig, [channel]);
+    expect(config.channels.map((c) => c.id)).toEqual(["key-2"]);
+    expect(config.imageModel).toBe("key-2::gpt-image-2.5");
+    expect(config.videoModel).toBe("key-2::seedance-2");
+    expect(config.textModel).toBe("key-2::gpt-6-sol");
+    expect(config.audioModel).toBe("");
+    // Switching to a key without video clears the video default instead of keeping a dead model.
+    const imageOnly = applyEmbedChannels(config, [{ ...channel, id: "key-3", models: channel.models.slice(0, 1) }]);
+    expect(imageOnly.imageModel).toBe("key-3::gpt-image-2.5");
+    expect(imageOnly.videoModel).toBe("");
 });
 
-test("embed channels replace the stock channel and pick defaults per capability", () => {
-    const config = applyEmbedChannels(defaultConfig, readEmbedChannels(`#embed=${encode(channels)}`)!);
-    expect(config.channels.map((c) => c.id)).toEqual(["image", "video"]);
-    expect(config.imageModel).toBe("image::gpt-image-2.5");
-    expect(config.textModel).toBe("image::gpt-6-sol");
-    expect(config.videoModel).toBe("video::seedance-2");
-    expect(config.audioModel).toBe("");
-    // A still-valid earlier choice is kept on the next open.
-    const again = applyEmbedChannels({ ...config, textModel: "image::gpt-6-sol" }, config.channels);
-    expect(again.textModel).toBe("image::gpt-6-sol");
+test("default key: remembered first, then one that can draw, never an empty key", () => {
+    const options = [
+        { id: 1, name: "chat", group: "codex", models: [{ name: "gpt-6-sol", capability: "text" as const }] },
+        { id: 2, name: "draw", group: "image", models: [{ name: "gpt-image-2.5", capability: "image" as const }] },
+        { id: 3, name: "empty", group: "x", models: [] },
+    ];
+    expect(defaultKeyOption(options, 1)?.id).toBe(1);
+    expect(defaultKeyOption(options, 3)?.id).toBe(2);
+    expect(defaultKeyOption(options, null)?.id).toBe(2);
+    expect(defaultKeyOption([options[2]], null)).toBeUndefined();
 });
