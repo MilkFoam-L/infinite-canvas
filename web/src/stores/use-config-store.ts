@@ -1,6 +1,8 @@
 import { useMemo } from "react";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+
+import type { EmbedChannel } from "@/lib/apophiscode-embed";
 import { nanoid } from "nanoid";
 
 import i18n from "@/i18n";
@@ -143,6 +145,7 @@ type ConfigStore = {
     shouldPromptContinue: boolean;
     updateConfig: <K extends keyof AiConfig>(key: K, value: AiConfig[K]) => void;
     importChannelCredentials: (input: { baseUrl?: string | null; apiKey?: string | null }) => ChannelCredentialsImportResult;
+    applyEmbedChannels: (channels: EmbedChannel[]) => void;
     updateWebdavConfig: <K extends keyof WebdavSyncConfig>(key: K, value: WebdavSyncConfig[K]) => void;
     isAiConfigReady: (config: AiConfig, model: string) => boolean;
     openConfigDialog: (shouldPromptContinue?: boolean, tab?: ConfigTabKey) => void;
@@ -233,6 +236,7 @@ export const useConfigStore = create<ConfigStore>()(
                 if (result.config !== currentConfig) set({ config: result.config });
                 return { status: result.status, channelName: result.channelName };
             },
+            applyEmbedChannels: (channels) => set({ config: applyEmbedChannels(get().config, channels) }),
             updateWebdavConfig: (key, value) =>
                 set((state) => ({
                     webdav: {
@@ -320,6 +324,30 @@ export function createModelChannel(channel?: Partial<ModelChannel>): ModelChanne
         apiKey: channel?.apiKey || "",
         apiFormat,
         models: normalizeChannelModels(channel?.models),
+    };
+}
+
+/**
+ * ApophisCode embed: the host's channels replace every configured channel, and
+ * each default model falls back to the first model of its capability when the
+ * previous choice is gone.
+ */
+export function applyEmbedChannels(config: AiConfig, embed: EmbedChannel[]): AiConfig {
+    const channels = embed.map((channel) => createModelChannel({ ...channel, apiFormat: "openai" }));
+    const next = { ...config, channels, models: modelOptionsFromChannels(channels) };
+    const pick = (current: string, capability: ModelCapability) => {
+        const kept = normalizeModelOptionValue(current, channels);
+        if (kept && modelCapabilityOf(next, kept) === capability) return kept;
+        const first = channels.flatMap((channel) => channel.models.filter((model) => model.capability === capability).map((model) => encodeChannelModel(channel.id, model.name)))[0];
+        return first || "";
+    };
+    return {
+        ...next,
+        model: pick(config.model, "image"),
+        imageModel: pick(config.imageModel, "image"),
+        videoModel: pick(config.videoModel, "video"),
+        textModel: pick(config.textModel, "text"),
+        audioModel: pick(config.audioModel, "audio"),
     };
 }
 

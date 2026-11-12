@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 
 import { useConfigStore } from "@/stores/use-config-store";
 import { usePromptSourceScheduler } from "@/hooks/use-prompt-source-scheduler";
+import { APOPHISCODE_EMBED, INITIAL_HASH, readEmbedChannels } from "@/lib/apophiscode-embed";
 
 export function ClientRootInit({ children }: { children: ReactNode }) {
     const { message } = App.useApp();
@@ -12,11 +13,20 @@ export function ClientRootInit({ children }: { children: ReactNode }) {
     const handledConfigParams = useRef(false);
     const importChannelCredentials = useConfigStore((state) => state.importChannelCredentials);
     const openConfigDialog = useConfigStore((state) => state.openConfigDialog);
+    const applyEmbedChannels = useConfigStore((state) => state.applyEmbedChannels);
 
     usePromptSourceScheduler();
 
     useEffect(() => {
         if (handledConfigParams.current) return;
+        if (APOPHISCODE_EMBED) {
+            handledConfigParams.current = true;
+            const channels = readEmbedChannels(INITIAL_HASH);
+            if (!channels) return;
+            window.history.replaceState(window.history.state, "", `${window.location.pathname}${window.location.search}`);
+            applyEmbedChannels(channels);
+            return;
+        }
         const searchParams = new URLSearchParams(window.location.search);
         const baseUrl = searchParams.get("baseUrl") || searchParams.get("baseurl");
         const apiKey = searchParams.get("apiKey") || searchParams.get("apikey");
@@ -33,7 +43,7 @@ export function ClientRootInit({ children }: { children: ReactNode }) {
         else if (result.status === "updated") message.success(t("config.importedChannelUpdated", { name: result.channelName }));
         else if (result.status === "missing-base-url") message.error(t("config.importedChannelBaseUrlRequired"));
         else message.error(t("config.importedChannelBaseUrlInvalid"));
-    }, [importChannelCredentials, message, openConfigDialog, t]);
+    }, [applyEmbedChannels, importChannelCredentials, message, openConfigDialog, t]);
 
     return <>{children}</>;
 }
