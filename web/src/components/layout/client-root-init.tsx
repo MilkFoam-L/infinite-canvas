@@ -4,6 +4,7 @@ import { App } from "antd";
 import { useTranslation } from "react-i18next";
 
 import { useConfigStore } from "@/stores/use-config-store";
+import { useThemeStore } from "@/stores/use-theme-store";
 import { usePromptSourceScheduler } from "@/hooks/use-prompt-source-scheduler";
 import { applyEmbedKey } from "@/components/layout/embed-key-modal";
 import { APOPHISCODE_EMBED, defaultKeyOption, embedBridge, rememberedKeyId } from "@/lib/apophiscode-embed";
@@ -16,6 +17,22 @@ export function ClientRootInit({ children }: { children: ReactNode }) {
     const openConfigDialog = useConfigStore((state) => state.openConfigDialog);
 
     usePromptSourceScheduler();
+
+    // Embed: follow the host page's light/dark theme, now and whenever it changes.
+    useEffect(() => {
+        if (!APOPHISCODE_EMBED) return;
+        let root: HTMLElement;
+        try {
+            root = window.parent.document.documentElement;
+        } catch {
+            return;
+        }
+        const sync = () => useThemeStore.getState().setTheme(root.classList.contains("dark") ? "dark" : "light");
+        sync();
+        const observer = new MutationObserver(sync);
+        observer.observe(root, { attributes: true, attributeFilter: ["class"] });
+        return () => observer.disconnect();
+    }, []);
 
     useEffect(() => {
         if (handledConfigParams.current) return;

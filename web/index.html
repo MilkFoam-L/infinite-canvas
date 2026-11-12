@@ -10,6 +10,10 @@
             try {
                 var s = JSON.parse(localStorage.getItem("infinite-canvas:theme_store") || "{}");
                 var t = s.state && s.state.theme === "light" ? "light" : "dark";
+                // Embedded under a same-origin host page: start in the host's theme to avoid a flash.
+                try {
+                    if (window.parent !== window) t = window.parent.document.documentElement.classList.contains("dark") ? "dark" : "light";
+                } catch (e) {}
                 document.documentElement.classList.toggle("dark", t === "dark");
                 document.documentElement.style.colorScheme = t;
             } catch (e) {}
