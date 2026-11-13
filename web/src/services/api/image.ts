@@ -165,11 +165,22 @@ function validateImageSize(width: number, height: number) {
     if (pixels < IMAGE_MIN_PIXELS || pixels > IMAGE_MAX_PIXELS) throw new Error(apiText("imagePixelLimit"));
 }
 
+/** Scale a custom size proportionally into the allowed pixel/edge range instead of rejecting it. */
+export function fitImageSize(width: number, height: number) {
+    const pixels = width * height;
+    let scale = pixels < IMAGE_MIN_PIXELS ? Math.sqrt(IMAGE_MIN_PIXELS / pixels) : pixels > IMAGE_MAX_PIXELS ? Math.sqrt(IMAGE_MAX_PIXELS / pixels) : 1;
+    scale = Math.min(scale, IMAGE_MAX_EDGE / Math.max(width, height));
+    if (scale === 1) return { width, height };
+    const round = scale > 1 ? Math.ceil : Math.floor;
+    return { width: round((width * scale) / IMAGE_SIZE_STEP) * IMAGE_SIZE_STEP, height: round((height * scale) / IMAGE_SIZE_STEP) * IMAGE_SIZE_STEP };
+}
+
 function resolveRequestSize(size: string) {
     const value = size.trim();
     if (!value || value.toLowerCase() === "auto") return undefined;
-    const dimensions = parseImageDimensions(value);
-    if (dimensions) {
+    const parsed = parseImageDimensions(value);
+    if (parsed) {
+        const dimensions = fitImageSize(parsed.width, parsed.height);
         validateImageSize(dimensions.width, dimensions.height);
         return `${dimensions.width}x${dimensions.height}`;
     }
