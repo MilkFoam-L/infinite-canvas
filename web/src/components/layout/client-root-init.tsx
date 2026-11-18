@@ -6,8 +6,8 @@ import { useTranslation } from "react-i18next";
 import { useConfigStore } from "@/stores/use-config-store";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { usePromptSourceScheduler } from "@/hooks/use-prompt-source-scheduler";
-import { applyEmbedKey } from "@/components/layout/embed-key-modal";
-import { APOPHISCODE_EMBED, defaultKeyOption, embedBridge, rememberedKeyId } from "@/lib/apophiscode-embed";
+import { applyEmbedKey, applyEmbedKeys } from "@/components/layout/embed-key-modal";
+import { APOPHISCODE_EMBED, defaultKeyOption, embedBridge, rememberedKeyId, rememberedKeyIds } from "@/lib/apophiscode-embed";
 
 export function ClientRootInit({ children }: { children: ReactNode }) {
     const { message } = App.useApp();
@@ -40,7 +40,14 @@ export function ClientRootInit({ children }: { children: ReactNode }) {
             handledConfigParams.current = true;
             // Refresh the remembered key's models on every open; ask when there is none.
             void (async () => {
-                const option = defaultKeyOption((await embedBridge()?.list()) ?? [], rememberedKeyId());
+                const options = (await embedBridge()?.list()) ?? [];
+                const listed = new Set(options.filter((item) => item.models.length > 0).map((item) => item.id));
+                const remembered = rememberedKeyIds().filter((id) => listed.has(id));
+                if (remembered.length > 1) {
+                    await applyEmbedKeys(remembered);
+                    return;
+                }
+                const option = defaultKeyOption(options, rememberedKeyId());
                 if (option) await applyEmbedKey(option.id);
                 else openConfigDialog(false);
             })().catch(() => openConfigDialog(false));

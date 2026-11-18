@@ -22,6 +22,8 @@ export type EmbedKeyOption = { id: number; name: string; group: string; models: 
 type EmbedBridge = {
     list: () => Promise<EmbedKeyOption[]>;
     channel: (id: number) => Promise<EmbedChannel>;
+    /** Creates (or reuses) one key per kind of model; older hosts lack it. */
+    quickSetup?: () => Promise<{ ids: number[]; channels: EmbedChannel[] }>;
 };
 
 export function embedBridge(): EmbedBridge | null {
@@ -34,21 +36,32 @@ export function embedBridge(): EmbedBridge | null {
 
 const KEY_STORAGE = "apophiscode:canvas-key-id";
 
-export function rememberedKeyId(): number | null {
+/** Keys in use; several after a quick setup, since each kind of model has its own group. */
+export function rememberedKeyIds(): number[] {
     try {
-        const id = Number(localStorage.getItem(KEY_STORAGE));
-        return Number.isFinite(id) && id > 0 ? id : null;
+        return (localStorage.getItem(KEY_STORAGE) ?? "")
+            .split(",")
+            .map(Number)
+            .filter((id) => Number.isFinite(id) && id > 0);
     } catch {
-        return null;
+        return [];
+    }
+}
+
+export function rememberedKeyId(): number | null {
+    return rememberedKeyIds()[0] ?? null;
+}
+
+export function rememberKeyIds(ids: number[]) {
+    try {
+        localStorage.setItem(KEY_STORAGE, ids.join(","));
+    } catch {
+        // Storage unavailable: the picker opens again next time.
     }
 }
 
 export function rememberKeyId(id: number) {
-    try {
-        localStorage.setItem(KEY_STORAGE, String(id));
-    } catch {
-        // Storage unavailable: the picker opens again next time.
-    }
+    rememberKeyIds([id]);
 }
 
 /** The remembered key when it is still listed, else the first key that can draw, else any key with models. */
